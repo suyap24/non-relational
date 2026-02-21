@@ -1,49 +1,56 @@
-require('dotenv').config();
 const express = require('express');
-const mongoose = require('mongoose');
+const mysql = require('mysql2');
 const cors = require('cors');
-const Student = require('./models/Student');
+const bodyParser = require('body-parser');
 
 const app = express();
+const port = 3000;
 
+// Middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
+app.use(bodyParser.json());
 
-/* DB CONNECT */
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB Connected Successfully"))
-  .catch(err => console.log(err));
-
-/* CREATE */
-app.post('/students', async (req, res) => {
-  try {
-    const student = new Student(req.body);
-    await student.save();
-    res.json({ message: "Student Added Successfully" });
-  } catch (err) {
-    res.status(500).json(err);
-  }
+// MySQL Connection
+const db = mysql.createConnection({
+    host: 'localhost',
+    user: 'root',      // Tu jevha MySQL install kela tevha username 'root' asel
+    password: 'admin1234',      // Password empty asel tar '' rhavar
+    database: 'student112'
 });
 
-/* READ */
-app.get('/students', async (req, res) => {
-  const students = await Student.find().sort({ createdAt: -1 });
-  res.json(students);
+db.connect((err) => {
+    if (err) {
+        console.error('Database connection failed:', err);
+    } else {
+        console.log('Connected to MySQL Database');
+    }
 });
 
-/* UPDATE */
-app.put('/students/:id', async (req, res) => {
-  await Student.findByIdAndUpdate(req.params.id, req.body);
-  res.json({ message: "Student Updated Successfully" });
+
+// API: Get Data (Read)
+app.get('/students', (req, res) => {
+    const sql = "SELECT * FROM students";
+    db.query(sql, (err, results) => {
+        if (err) return res.json({ Message: "Server Error" });
+        return res.json(results);
+    });
 });
 
-/* DELETE */
-app.delete('/students/:id', async (req, res) => {
-  await Student.findByIdAndDelete(req.params.id);
-  res.json({ message: "Student Deleted Successfully" });
+// API: Insert Data (Create)
+app.post('/students', (req, res) => {
+    const sql = "INSERT INTO students (name, email, phone, course) VALUES (?, ?, ?, ?)";
+    const values = [
+        req.body.name,
+        req.body.email,
+        req.body.phone,
+        req.body.course
+    ];
+    db.query(sql, values, (err, result) => {
+        if (err) return res.json({ Message: "Error inserting data" });
+        return res.json({ success: "Student Added Successfully" });
+    });
 });
 
-app.listen(process.env.PORT, () => {
-  console.log(`Server running at http://localhost:${process.env.PORT}`);
+app.listen(port, () => {
+    console.log(`Server running on http://localhost:${port}`);
 });
